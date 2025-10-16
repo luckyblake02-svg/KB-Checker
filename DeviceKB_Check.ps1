@@ -71,8 +71,9 @@ foreach ($dev in $csv) {
         $dev.OSVersion = "NULL"
     }
     else {
-        #Patches are currently entered by hand from MSRC page. Example: https://msrc.microsoft.com/update-guide/en-US/advisory/CVE-2025-59230
+        #Grab URL from vulnerability info, as this is where the KB is stored.
         $build = $patches | Where-Object FixedBuild -Match $osData | Select-Object URL
+        #Extract the KB from the URL.
         $fix = try { $build.URL.Split("q=")[1] }
         catch { Write-Host "It appears that the KB for $osData doesn't come up."}
         
