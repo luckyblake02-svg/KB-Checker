@@ -51,13 +51,8 @@ catch { Write-Host "Connection failed." ; exit 0 }
 $date = (Get-Date).AddDays(-15)
 
 #Grab list of devices from Intune. Requires Intune administrator or read all devices.
-try { Write-Host "Grabbing Intune Device List..." ; Get-MgDeviceManagementManagedDevice | Select-Object deviceName, LastSyncDateTime, OSVersion | Where-Object LastSyncDateTime -GT $date | Export-Csv -Path "C:\temp\IntuneDeviceInventory.csv" -NoTypeInformation }
+$csv = try { Write-Host "Grabbing Intune Device List..." ; Get-MgDeviceManagementManagedDevice | Select-Object deviceName, LastSyncDateTime, OSVersion | Where-Object LastSyncDateTime -GT $date | ForEach-Object { $_ | Add-Member -NotePropertyName Patch -NotePropertyValue ""; $_ } -NoTypeInformation }
 catch { Write-Host "Intune query failed." ; exit 0 }
-
-$csv = Import-Csv -Path "C:\temp\IntuneDeviceInventory.csv"
-
-#For each item, add a "Patch" field for later.
-$csv | ForEach-Object { $_ | Add-Member -NotePropertyName Patch -NotePropertyValue ""; $_ }
 
 Write-Host "Added Patch property to list."
 
