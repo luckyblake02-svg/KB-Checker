@@ -1,101 +1,123 @@
 ***
 
-# README – MSRC CVE Patch Compliance Script
+# KB-Checker  
+
+PowerShell utility for verifying **Windows KB patch compliance** across endpoints.  
+It can run **standalone** on a local machine or optionally integrate with **Microsoft Intune** and **ConnectWise Control** to automate remote checking at scale.
 
 ***
 
-## Overview
+## ✳️ Overview  
 
-This PowerShell script automates **Microsoft Security Response Center (MSRC) CVE verification and patch compliance** across Intune-managed Windows 11 devices integrated with ConnectWise Control (ScreenConnect).
+**DeviceKB_Check.ps1** helps administrators determine whether a specific Windows update (KB) is installed on one or more systems.  
+You can run it manually, point it to a computer list, or connect to managed devices dynamically through Intune or ScreenConnect.  
 
-It connects to the MSRC API to retrieve vulnerability data, MS Graph to enumerate recent Intune devices, and the ConnectWise Control API to check live systems for the specified patch (KB). The result is a list of devices that are patched or unpatched based on the selected CVE.
-
-***
-
-## Features
-
-- Queries the **MSRC Security Updates API** for current or custom month/year bulletins.  
-- Prompts for a specific **CVE ID** and retrieves related **Windows 11 remediations (KBs)**.  
-- Connects to **Microsoft Graph API** to list Intune devices active within the last 15 days.  
-- Maps each Intune device’s OS version to **Windows 11 release codes** (21H2 / 22H2 / 23H2 / 24H2).  
-- Connects to **ConnectWise Control** and executes `Get-Hotfix` remotely to verify patch presence.  
-- Exports compliance results to text files:
-  - `patched<CVE>.txt`
-  - `unpatched<CVE>.txt`
+Each device check runs a PowerShell-level validation and produces two export files — *patched* and *unpatched* — for quick compliance reporting.
 
 ***
 
-## Prerequisites
+## ⚙️ Workflow  
 
-Before running this script, install and import the following PowerShell modules:
+1. The script prompts for a KB identifier (e.g., `KB5054007`).  
+2. Depending on available inputs or connected APIs, it determines the appropriate query mode:  
+   - **Local system** check  
+   - **Multiple computers** from a local file  
+   - **Microsoft Intune** device inventory (if selected)  
+   - **ConnectWise Control (ScreenConnect)** remote command execution (if available)  
+3. Executes `Get-HotFix` (locally or remotely) and validates whether the KB is installed.  
+4. Results are saved to the local path `C:\temp` as:  
+   ```
+   patched<KB>.txt
+   unpatched<KB>.txt
+   ```
+5. A summary of total devices checked, patched, and unpatched is shown upon completion.
 
+***
+
+## 📦 Features  
+
+- Simple PowerShell-based KB validation — no external dependencies required.  
+- Optionally query **Intune-managed** devices or **ScreenConnect**-connected endpoints.  
+- Supports dynamic build mapping for Windows 11 releases (21H2–24H2).  
+- Includes **parallel query handling** and resilient retry logic for remote systems.  
+- Generates clear plain-text compliance output suitable for audit reports or SIEM ingestion.  
+- Fully offline capable — runs without any API integrations if invoked locally.
+
+***
+
+## 🚀 Requirements  
+
+### Minimum  
+- PowerShell 7.0 or newer  
+- Windows 10/11 (build 22000+)
+
+### Optional Modules  
 ```powershell
-Install-Module Microsoft.Graph
-Import-Module Microsoft.Graph
-
-Install-Module ConnectWiseControlAPI
-Import-Module ConnectWiseControlAPI
-
-Install-Module MsrcSecurityUpdates
-Import-Module MsrcSecurityUpdates
+Install-Module Microsoft.Graph              # Intune integration
+Install-Module ConnectWiseControlAPI        # ScreenConnect integration
+Install-Module MsrcSecurityUpdates          # (Optional) MSRC metadata reference
 ```
 
-Additional requirements:
-
-- **Microsoft Graph permissions**: `Device.Read.All`, `DeviceManagementManagedDevices.Read.All`
-- **Intune access**: Intune administrator or read-only scope
-- **ConnectWise Control credentials**: account authorized for remote command execution (no MFA)
-- **PowerShell 7+** recommended for performance and error handling
-
 ***
 
-## Workflow
+## 🔐 Permissions (for Optional Integrations)  
 
-1. Script prompts if you wish to search the **current month’s MSRC report**.  
-2. Optionally select another **month/year** (e.g., “Oct” and “2025”).  
-3. The script fetches all vulnerabilities for that bulletin via **MSRC API**.  
-4. You enter the desired **CVE ID**, and the script filters for **Windows 11** remediations.  
-5. Authenticates to **Microsoft Graph** to retrieve all Intune devices synced within the past 15 days.  
-6. Maps each device’s **OS version → release code (21H2–24H2)**.  
-7. Connects to **ConnectWise Control** and runs `Get-Hotfix` on each registered system.
-8. Checks if the reported **KB ID** for the CVE is installed.
-9. Exports two result files to `C:\temp\`:
-   - `patched<CVE>.txt` – devices with the KB present
-   - `unpatched<CVE>.txt` – devices missing the KB
-
-***
-
-## Output Example
-
-After execution, you will find files like:
-
+**Microsoft Graph API** scopes required if Intune mode is used:
 ```
-C:\temp\patchedCVE-2025-12345.txt
-C:\temp\unpatchedCVE-2025-12345.txt
+Device.Read.All
+DeviceManagementManagedDevices.Read.All
 ```
 
-Each file contains a simple list of device names and their patch status.
+***
+
+## 💾 Output Example  
+
+Generated export files:
+```
+C:\temp\patchedKB5054007.txt
+C:\temp\unpatchedKB5054007.txt
+```
+
+Each file contains one device name per line representing patch status.
+
+Console sample summary:
+```
+Checked 14 devices
+9 patched, 5 unpatched
+Results saved to C:\temp\
+```
 
 ***
 
-## Notes
+## 🧠 Notes  
 
-- Windows 10 builds below `10.0.22000` are skipped (deprecated).  
-- CVE-to-KB relationships for remediations are parsed directly from MSRC data.  
-- The script uses pattern matching to handle build variations (e.g., `10.0.26*` for 24H2).
-
-***
-
-## References
-
-- [ConnectWiseControlAPI by christaylorcodes](https://github.com/christaylorcodes/ConnectWiseControlAPI)
-- [MSRC Microsoft Security Updates API](https://github.com/microsoft/MSRC-Microsoft-Security-Updates-API)
+- Compatible with Windows 11 builds 21H2 through 24H2.  
+- Skips unsupported OS builds below `10.0.22000`.  
+- Automatically detects missing modules and uses local fallback checks if APIs are unused.  
+- Retries remote queries for temporarily disconnected or offline machines.  
+- Built for both single-system use and large-scale remediation audits.  
 
 ***
 
-## Author
+## 🧾 License  
+
+Distributed under the **GPL-3.0 License**.  
+You are free to modify, extend, and integrate into enterprise automation or vulnerability compliance frameworks.
+
+***
+
+## 👤 Author  
 
 **Blake Miller**  
-Cybersecurity Professional – Infrastructure & Endpoint Compliance Automation
+Cybersecurity Professional – Endpoint Security & Compliance Automation  
+Kansas, United States  
+
+***
+
+## 📚 References  
+
+- [Microsoft Graph PowerShell SDK](https://learn.microsoft.com/en-us/powershell/microsoftgraph)  
+- [ConnectWise Control Public API](https://github.com/christaylorcodes/ConnectWiseControlAPI)  
+- [MSRC Security Updates API](https://api.msrc.microsoft.com/api)  
 
 ***
