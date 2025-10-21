@@ -151,8 +151,10 @@ function CWProbe {
     $group = 'All Machines by Company'
     #Devices with KB applied.
     $KBList = @()
+    $y = 0
     #Devices without KB applied.
     $KBNotList = @()
+    $n = 0
 
     #Green means go.
     $green = $access | Where-Object Name -In $out.DeviceName
@@ -190,6 +192,7 @@ function CWProbe {
         if ($patchCheck) {
             Write-Host "Patch appears to be applied to $name!" -ForegroundColor Cyan
             $KBList += $patchCheck
+            $y += 1
         }
         else {
             Write-Host "Patch is not applied to $name, please remediate." -ForegroundColor DarkCyan
@@ -197,8 +200,11 @@ function CWProbe {
                 Machine = $name
                 MissingPatch = $devCheck.Patch
             }
+            $n += 1
         }
     }
+    Write-Host "It appears that there are $y patched devices and $n unpatched devices total." -ForegroundColor Cyan
+    
     $KBList | Out-File "C:\temp\patched$vuln.txt"
     $KBNotList | Out-File "C:\temp\unpatched$vuln.txt"
 }
