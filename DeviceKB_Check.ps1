@@ -476,9 +476,9 @@ function CVEList {
         $title | Out-File -Path "C:\temp\$month$year.txt"
     }
     elseif ($next -match "([Ss]earch)") {
-        Write-Host "Here was your selection: $sel" -ForegroundColor Cyan
         #If multiple values selected.
         foreach ($val in $sel) {
+            Write-Host "Here was your selection: $sel" -ForegroundColor Cyan
             $vulnInfo = $cve.Vulnerability | Where-Object Title -match $val
             $vulnTitle = $vulnInfo.Title.Value
             $vulnCVE = $vulnInfo.CVE
