@@ -204,7 +204,7 @@ function CWProbe {
         }
     }
     Write-Host "It appears that there are $y patched devices and $n unpatched devices total." -ForegroundColor Cyan
-    
+
     $KBList | Out-File "C:\temp\patched$vuln.txt"
     $KBNotList | Out-File "C:\temp\unpatched$vuln.txt"
 }
@@ -411,8 +411,9 @@ function CVEInfo {
                     Write-Host "Please enter either 2XH2 format or 10.0.XXXXX format." -ForegroundColor Magenta ; exit 0
                 }
                 #Sometimes there are multiple values.
-                foreach ($val in ($data.Remediations.URL | Where-Object FixedBuild -eq $os)) {
-                    Write-Host "`nURL: $val" -ForegroundColor Green
+                foreach ($val in ($data.Remediations | Where-Object FixedBuild -Match $os)) {
+                    $url = $val.URL
+                    Write-Host "`nURL: $url`n" -ForegroundColor Green
                 }
                 #This is inside the loop because if they enter yes, it goes right back to OS entry instead of line 1.
                 $round = Read-Host -Prompt "Would you like to look for another OS"
@@ -478,7 +479,7 @@ function CVEList {
     elseif ($next -match "([Ss]earch)") {
         #If multiple values selected.
         foreach ($val in $sel) {
-            Write-Host "Here was your selection: $sel" -ForegroundColor Cyan
+            Write-Host "Here was your selection: $val" -ForegroundColor Cyan
             $vulnInfo = $cve.Vulnerability | Where-Object Title -match $val
             $vulnTitle = $vulnInfo.Title.Value
             $vulnCVE = $vulnInfo.CVE
