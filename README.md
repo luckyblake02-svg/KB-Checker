@@ -147,6 +147,10 @@ The script saves results and logs to:
 
 ## License
 
-This script is distributed under the MIT License. External modules used retain their original licenses from respective authors.
+This script is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html) (GPL-3.0).  
 
-```
+You are free to use, modify, and distribute this script under the terms of the GPL v3.0 license. Any derivative works or distributions must also be licensed under GPL v3.0, and must include this license notice.  
+
+This license ensures that all modifications remain open source, preserving the freedoms to use, study, share, and improve the software.
+
+For full license details, see [https://www.gnu.org/licenses/gpl-3.0.en.html](https://www.gnu.org/licenses/gpl-3.0.en.html).
