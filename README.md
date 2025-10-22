@@ -1,4 +1,3 @@
-```markdown
 # DeviceKB_Check.ps1
 
 ## Overview
