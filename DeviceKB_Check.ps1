@@ -408,7 +408,7 @@ function CVEInfo {
                 }
                 else {
                     #I need to be able to read it.
-                    debugLog "Please enter either 2XH2 format or 10.0.XXXXX format." "Magenta"
+                    debugLog "Please enter either 2XH2 format or 10.0.XXXXX format." "Magenta" ; exit 0
                 }
                 #Sometimes there are multiple values.
                 foreach ($val in ($data.Remediations | Where-Object FixedBuild -Match $os)) {
