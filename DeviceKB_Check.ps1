@@ -15,7 +15,7 @@ MSRC API from https://github.com/microsoft/MSRC-Microsoft-Security-Updates-API b
 
 function CVE2KB {
 
-    Write-Host "
+    debugLog "
     
        _____________   _______________________  ____  __.__________ 
        \_   ___ \   \ /   /\_   _____/\_____  \|    |/ _|\______   \
@@ -24,7 +24,7 @@ function CVE2KB {
         \______  / \___/   /_______  /\_______ \____|__ \ |______  /
                \/                  \/         \/       \/        \/ 
 
-    " -ForegroundColor Blue
+    "  Blue
 
     #Check if we are using current month/year.
     $check = Read-Host -Prompt "Would you like to search the current month MSRC report"
@@ -39,7 +39,7 @@ function CVE2KB {
 
     #Query MSRC API to get Month/Year catalog.
     $cve = try { Get-MsrcCvrfDocument -ID "$year-$month" }
-    catch { Write-Host "Query for MSRC Document for $month $year failed." -ForegroundColor Red ; exit 0}
+    catch { debugLog "Query for MSRC Document for $month $year failed." "Red" ; exit 0}
 
     #Get specific CVE.
     $vuln = Read-Host -Prompt "What vulnerability would you like to look for"
@@ -60,15 +60,15 @@ function CVE2KB {
             $csv = CSVImport ; $rdy = $true
         }
         else {
-            Write-Host "Please enter either 'Intune' or 'CSV'" -ForegroundColor Magenta
+            debugLog "Please enter either 'Intune' or 'CSV'" "Magenta"
         }
     }
 
     #Add Patch value to csv for each device to store KB later.
     try {$csv | Where-Object {$_ -ne $null} | ForEach-Object { $_ | Add-Member -NotePropertyName Patch -NotePropertyValue ""; $_ } | Out-Null}
-    catch {Write-Host "Something went wrong adding Patch property to csv." -ForegroundColor Red}
+    catch {debugLog "Something went wrong adding Patch property to csv." "Red"}
     
-    Write-Host "Added Patch property to list." -ForegroundColor Cyan
+    debugLog "Added Patch property to list." "Cyan"
 
     #Declare output array.
     $out = @()
@@ -81,7 +81,7 @@ function CVE2KB {
         #Extract the KB from the URL, if it exists.
         if ($build) {
             $fix = try { $build.URL.Split("q=")[1] }
-            catch { Write-Host "It appears that the KB for $os doesn't come up." -ForegroundColor Red}
+            catch { debugLog "It appears that the KB for $os doesn't come up." "Red"}
         }
         #Map OS version to 4 character code.
         switch ($os) {
@@ -112,7 +112,7 @@ function CVE2KB {
     }
     #Clear $csv variable. I was having issues clearing console output when returning $csv from import functions.
     $csv = ""
-    Write-Host "`nDevice OS mapped to 4-Character code (e.g. 24H2) and Patch property applied." -ForegroundColor Cyan
+    debugLog "`nDevice OS mapped to 4-Character code (e.g. 24H2) and Patch property applied." "Cyan"
 
     $test = Read-Host -Prompt "`nCurrently, the only supported way to test for the patch being applied is through Connectwise. Would you like to continue"
     if ($test -match "([Yy][Ee]?[Ss]?)") {
@@ -120,13 +120,13 @@ function CVE2KB {
     }
     else {
         $out | Export-Csv -Path "C:\temp\deviceList.csv" -NoTypeInformation
-        Write-Host "Nothing left to do, we have exported the current csv to your C:\Temp folder!" -ForegroundColor Cyan
+        debugLog "Nothing left to do, we have exported the current csv to your C:\Temp folder!" "Cyan"
     }
 }
         
 function CWProbe {
     
-    Write-Host "
+    debugLog "
     
     _________  __      ____________              ___.           
     \_   ___ \/  \    /  \______   \_______  ____\_ |__   ____  
@@ -135,15 +135,15 @@ function CWProbe {
      \______  / \__/\  /  |____|     |__|   \____/|___  /\___  >
             \/       \/                               \/     \/ 
     
-    " -ForegroundColor Blue
+    " "Blue"
     
     #Declare parameter as the array created in main function.
     Param (
         [PSCustomObject]$out
     )
     #Attempt to connect to CW API. This requires a user with NO MFA, or else connection will fail.
-    try { Write-Host "Attempting to connect to ConnectWise Control" -ForegroundColor Cyan ; Connect-CWC -Server 'server.connectwise.com' }
-    catch { Write-Host "Connection attemp failed." -ForegroundColor Red ; exit 0 }
+    try { debugLog "Attempting to connect to ConnectWise Control" "Cyan" ; Connect-CWC -Server 'server.connectwise.com' }
+    catch { debugLog "Connection attemp failed." "Red" ; exit 0 }
 
     #Get a list of all access CW sessions.
     $access = Get-CWCSession -Type 'Access'
@@ -167,7 +167,7 @@ function CWProbe {
             $guid = $comp.SessionID
             #Tell the machine to run 'Get-Hotfix' in powershell, listing all applied KBs.
             try { $KB = Invoke-CWCCommand -Group $group -GUID $guid -TimeOut 10000 -Powershell -Command 'Get-Hotfix' -ErrorAction SilentlyContinue }
-            catch { Write-Host "Invoke CW Command failed for $name." -ForegroundColor Red }
+            catch { debugLog "Invoke CW Command failed for $name." "Red" }
             Start-Sleep 3
         }
         #Split by newline, removing the first and second lines, as they are unnecessary.
@@ -190,12 +190,12 @@ function CWProbe {
 
         #If the KB is applied, this is true.
         if ($patchCheck) {
-            Write-Host "Patch appears to be applied to $name!" -ForegroundColor Cyan
+            debugLog "Patch appears to be applied to $name!" "Cyan"
             $KBList += $patchCheck
             $y += 1
         }
         else {
-            Write-Host "Patch is not applied to $name, please remediate." -ForegroundColor DarkCyan
+            debugLog "Patch is not applied to $name, please remediate." "DarkCyan"
             $KBNotList += [PSCustomObject]@{
                 Machine = $name
                 MissingPatch = $devCheck.Patch
@@ -203,7 +203,7 @@ function CWProbe {
             $n += 1
         }
     }
-    Write-Host "It appears that there are $y patched devices and $n unpatched devices total." -ForegroundColor Cyan
+    debugLog "It appears that there are $y patched devices and $n unpatched devices total." "Cyan"
 
     $KBList | Out-File "C:\temp\patched$vuln.txt"
     $KBNotList | Out-File "C:\temp\unpatched$vuln.txt"
@@ -211,7 +211,7 @@ function CWProbe {
 
 function IntunePull {
 
-    Write-Host "
+    debugLog "
     
     .___        __                     __________      .__  .__   
     |   | _____/  |_ __ __  ____   ____\______   \__ __|  | |  |  
@@ -220,7 +220,7 @@ function IntunePull {
     |___|___|  /__| |____/|___|  /\___  >____|   |____/|____/____/
              \/                \/     \/                          
     
-    " -ForegroundColor Blue
+    " "Blue"
 
     #Declare an array to store computers.
     $csv = @()
@@ -228,19 +228,19 @@ function IntunePull {
     if ($ans -match "([Yy][Ee]?[Ss]?)") {
     }
     else {
-        Write-Host "You will need permissions to run this." -ForegroundColor Red ; exit 0
+        debugLog "You will need permissions to run this." "Red"; exit 0
     }
 
     #Authenticate to MS Graph. Requires Cloud App Admin privileges or someone who can approve Graph read permissions.
-    try { Write-Host "Connecting to MS Graph..." -ForegroundColor Cyan ; Connect-MgGraph -Scopes "Device.Read.All", "DeviceManagementManagedDevices.Read.All" -NoWelcome}
-    catch { Write-Host "Connection failed." -ForegroundColor Red ; exit 0 }
+    try { debugLog "Connecting to MS Graph..." "Cyan" ; Connect-MgGraph -Scopes "Device.Read.All", "DeviceManagementManagedDevices.Read.All" -NoWelcome}
+    catch { debugLog "Connection failed." "Red" ; exit 0 }
 
     #Set Check in date to last 15 days.
     $date = (Get-Date).AddDays(-15)
 
     #Grab list of devices from Intune. Requires Intune administrator or read all devices.
-    $Tmpcsv = try { Write-Host "Grabbing Intune Device List..." -ForegroundColor Cyan ; Get-MgDeviceManagementManagedDevice | Select-Object deviceName, LastSyncDateTime, OSVersion | Where-Object LastSyncDateTime -GT $date -NoTypeInformation }
-    catch { Write-Host "Intune query failed." -ForegroundColor Red ; exit 0 }
+    $Tmpcsv = try { debugLog "Grabbing Intune Device List..." "Cyan" ; Get-MgDeviceManagementManagedDevice | Select-Object deviceName, LastSyncDateTime, OSVersion | Where-Object LastSyncDateTime -GT $date -NoTypeInformation }
+    catch { debugLog "Intune query failed." "Red" ; exit 0 }
 
     foreach ($dev in $Tmpcsv) {
         #Store only the first 3 block of the OS version.
@@ -261,7 +261,7 @@ function IntunePull {
 
 function CSVImport {
 
-    Write-Host "
+    debugLog "
     
    _________   _____________   ____.___                              __   
    \_   ___ \ /   _____/\   \ /   /|   | _____ ______   ____________/  |_ 
@@ -270,7 +270,7 @@ function CSVImport {
     \______  /_______  /   \___/   |___|__|_|  /   __/ \____/|__|   |__|  
            \/        \/                      \/|__|                       
 
-    " -ForegroundColor Blue
+    " "Blue"
 
     #Declare array to store computers.
     $csv = @()
@@ -305,10 +305,10 @@ function CSVImport {
         $chk = Read-Host -Prompt "Do you have access to list all devices in Active Directory via Powershell"
 
         if ($chk -match "([Yy][Ee]?[Ss]?)") {
-            Write-Host "Great! We will try to grab all machines from Active Directory now." -ForegroundColor Cyan
+            debugLog "Great! We will try to grab all machines from Active Directory now." "Cyan"
             #Grab all Win 11 enterprise devices. Change this to whatever you're looking for.
             try { $comp = Get-ADComputer -Filter 'OperatingSystem -eq "Windows 11 Enterprise"' -Properties CN,OperatingSystem,OperatingSystemVersion | Select-Object CN,OperatingSystemVersion | Sort-Object CN }
-            catch { Write-Host "Get-ADComputer failed." -ForegroundColor Red ; exit 0}
+            catch { debugLog "Get-ADComputer failed." "Red" ; exit 0}
 
             foreach ($dev in $comp) {
                 #Standard format is like 10.0 (22000). Not very nice.
@@ -320,18 +320,18 @@ function CSVImport {
             }
         }
         else {
-            Write-Host "You will need access for this" -ForegroundColor Red ; exit 0
+            debugLog "You will need access for this" "Red" ; exit 0
         }
     }
     else {
-        Write-Host "Please enter yes or no" -ForegroundColor Magenta ; CSVImport
+        debugLog "Please enter yes or no" "Magenta" ; CSVImport
     }
     return $csv
 }
 
 function CVEInfo {
     
-    Write-Host " 
+    debugLog " 
     
     _____________   _______________.___        _____       
     \_   ___ \   \ /   /\_   _____/|   | _____/ ____\____  
@@ -340,7 +340,7 @@ function CVEInfo {
      \______  / \___/   /_______  /|___|___|  /__|  \____/ 
             \/                  \/          \/             
     
-    " -ForegroundColor Blue
+    " "Blue"
 
     $done = $false
 
@@ -358,7 +358,7 @@ function CVEInfo {
 
         #Query MSRC API to get Month/Year catalog.
         $cve = try { Get-MsrcCvrfDocument -ID "$year-$month" }
-        catch { Write-Host "Query for MSRC Document for $month $year failed." -ForegroundColor Red ; exit 0}
+        catch { debugLog "Query for MSRC Document for $month $year failed." "Red" ; exit 0}
 
         #Get specific CVE.
         $vuln = Read-Host -Prompt "What vulnerability would you like to look for"
@@ -375,10 +375,10 @@ function CVEInfo {
             $cvss = $data.CVSSScoreSets[0].BaseScore
             $cvssVec = $data.CVSSScoreSets[0].Vector
 
-            Write-Host "`nTitle: $title`n`nDesc: $desc`n`nFAQ: $faq`n`n$cwe`n$cweVal`n`nCVSS Score: $cvss`n$cvssVec`n`n" -ForegroundColor Green
+            debugLog "`nTitle: $title`n`nDesc: $desc`n`nFAQ: $faq`n`n$cwe`n$cweVal`n`nCVSS Score: $cvss`n$cvssVec`n`n" "Green"
         }
         else {
-            Write-Host "It doesn't appear that $vuln is mapping to a CVE in this catalog. Please try again." -ForegroundColor Red ; exit 0
+            debugLog "It doesn't appear that $vuln is mapping to a CVE in this catalog. Please try again." "Red" ; exit 0
         }
 
         $rem = Read-Host -Prompt "Would you like to see the remediations"
@@ -408,12 +408,12 @@ function CVEInfo {
                 }
                 else {
                     #I need to be able to read it.
-                    Write-Host "Please enter either 2XH2 format or 10.0.XXXXX format." -ForegroundColor Magenta ; exit 0
+                    debugLog "Please enter either 2XH2 format or 10.0.XXXXX format." "Magenta" ; exit 0
                 }
                 #Sometimes there are multiple values.
                 foreach ($val in ($data.Remediations | Where-Object FixedBuild -Match $os)) {
                     $url = $val.URL
-                    Write-Host "`nURL: $url`n" -ForegroundColor Green
+                    debugLog "`nURL: $url`n" "Green"
                 }
                 #This is inside the loop because if they enter yes, it goes right back to OS entry instead of line 1.
                 $round = Read-Host -Prompt "Would you like to look for another OS"
@@ -437,7 +437,7 @@ function CVEInfo {
 
 function CVEList {
 
-    Write-Host " 
+    debugLog " 
     
     _____________   _______________.____    .__          __   
     \_   ___ \   \ /   /\_   _____/|    |   |__| _______/  |_ 
@@ -446,7 +446,7 @@ function CVEList {
      \______  / \___/   /_______  /|_______ \__/____  > |__|  
             \/                  \/         \/       \/        
     
-    " -ForegroundColor Blue
+    " "Blue"
 
     #Check if we are using current month/year.
     $check = Read-Host -Prompt "Would you like to search the current month MSRC report"
@@ -461,13 +461,13 @@ function CVEList {
 
     #Query MSRC API to get Month/Year catalog.
     $cve = try { Get-MsrcCvrfDocument -ID "$year-$month" }
-    catch { Write-Host "Query for MSRC Document for $month $year failed." -ForegroundColor Red ; exit 0}
+    catch { debugLog "Query for MSRC Document for $month $year failed." "Red" ; exit 0}
 
     #Sort it to look nice.
     $title = $cve.Vulnerability.Title | Sort-Object Value
     $ct = $cve.Vulnerability.Title.Count
 
-    Write-Host "`nThere are $ct vulnerabilities. We will output them to Grid View for you. If you would like to view one, select it to output to console." -ForegroundColor Cyan
+    debugLog "`nThere are $ct vulnerabilities. We will output them to Grid View for you. If you would like to view one, select it to output to console." "Cyan"
     Start-Sleep 5
     #Store the selection from the console grid view so it can be output later.
     $sel = ($title | Out-ConsoleGridView).Value
@@ -479,23 +479,113 @@ function CVEList {
     elseif ($next -match "([Ss]earch)") {
         #If multiple values selected.
         foreach ($val in $sel) {
-            Write-Host "Here was your selection: $val" -ForegroundColor Cyan
+            debugLog "Here was your selection: $val" "Cyan"
             $vulnInfo = $cve.Vulnerability | Where-Object Title -match $val
             $vulnTitle = $vulnInfo.Title.Value
             $vulnCVE = $vulnInfo.CVE
             if ($vulnInfo.Notes.Value[0]) {
                 #HTML output, parse tags.
                 $vulndesc = $vulnInfo.Notes.Value[0] -replace "<p>", '' -replace "</p>", ''
-                Write-Host "`nTitle: $vulnTitle`n`nCVE ID: $vulnCVE`n`nDesc: $vulndesc" -ForegroundColor Green
+                debugLog "`nTitle: $vulnTitle`n`nCVE ID: $vulnCVE`n`nDesc: $vulndesc" "Green"
             }
             else {
-                Write-Host "`nTitle: $vulnTitle`n`nCVE ID: $vulnCVE" -ForegroundColor Green
+                debugLog "`nTitle: $vulnTitle`n`nCVE ID: $vulnCVE" "Green"
             }
         }
     }
 }
 
-Write-Host "
+function KB2CVE {
+
+    debugLog "
+    
+     ____  __.__________ _____________________   _______________
+    |    |/ _|\______   \\_____  \_   ___ \   \ /   /\_   _____/
+    |      <   |    |  _/ /  ____/    \  \/\   Y   /  |    __)_ 
+    |    |  \  |    |   \/       \     \____\     /   |        \
+    |____|__ \ |______  /\_______ \______  / \___/   /_______  /
+            \/        \/         \/      \/                  \/ 
+    
+    " "Blue"
+
+    #Declare empty array
+    $vuln = @()
+
+    $check = Read-Host -Prompt "Would you like to search the current month MSRC report"
+    if ($check -match "([Yy][Ee]?[Ss]?)") {
+        $month = Get-Date -Format MMM
+        $year = Get-Date -Format yyy
+    }
+    else {
+        $month = Read-Host -Prompt "What month would you like to search (3 letter name)"
+        $year = Read-Host -Prompt "What year would you like to search (YYYY)"
+    }
+
+    #While condition for easy return upon input error.
+    $r = $false
+    while (!$r) {
+        $kb = Read-Host -Prompt "What KB would you like to look up"
+        #KB needs to only be numbers.
+        if ($kb -match '^[0-9]*') {
+            $r = $true
+        }
+        elseif ($kb -match '[K][B][0-9]*') {
+            #If the user prepends KB, just strip it off and leave the numbers for them.
+            $kb = $kb.Split("B")[1]
+            $r = $true
+        }
+        else {
+            debugLog "Please enter a KB ID (e.g. 123456)" "Magenta" ; exit 0
+        }
+    }
+
+    $doc = try { Get-MsrcCvrfDocument -ID "$year-$month" }
+    catch { debugLog "Query for MSRC Document for $month $year failed." "Red" ; exit 0}
+
+    #For each vulnerability in the report.
+    foreach ($item in $doc.Vulnerability) {
+        #If the remediations subtype list contains the KB id.
+        if ($item.Remediations.SubType -contains $kb) {
+            #Create our list of patched CVEs for the KB.
+            $vuln += [PSCustomObject]@{
+            Vulnerability = $item.Title.Value
+            CVE = $item.CVE
+            CVSS_Score= $item.CVSSScoreSets[0].BaseScore
+            }
+        }
+    }
+
+    #Let the user know we will port the list to console grid view.
+    debugLog "We have compiled the list. We will now port it to console grid view for you." "Green" ; Start-Sleep 5 ; ($vuln | Sort-Object Vulnerability) | Out-ConsoleGridView
+    $exp = Read-Host -Prompt "Would you like to save that list to CSV"
+    if ($exp -match '[Yy][Ee][Ss]') {
+        $vuln | Export-Csv C:\temp\kbFixes.csv | Out-Null
+    }
+    else {
+        debugLog "Nothing left to do here. Exiting." "DarkCyan" ; exit 0
+    }
+}
+
+function debugLog {
+
+    Param (
+        [string]$text,
+        [string]$color
+    )
+
+    #I use red for errors.
+    if ($color -eq "Red") {
+        $out = (Get-Date -UFormat "%Y-%m-%d %H:%M:%S") + " " + $text
+        $out | Out-File C:\temp\debug.txt -Append
+        Write-Host $text -ForegroundColor $color
+    }
+    else {
+        Write-Host $text -ForegroundColor $color
+    }
+
+}
+
+debugLog "
 
 ________              .__              ____  __.__________    _________ .__                   __    
 \______ \   _______  _|__| ____  ____ |    |/ _|\______   \   \_   ___ \|  |__   ____   ____ |  | __
@@ -504,7 +594,7 @@ ________              .__              ____  __.__________    _________ .__     
 /_______  /\___  >\_/ |__|\___  >___  >____|__ \ |______  /____\______  /___|  /\___  >\___  >__|_ \
         \/     \/             \/    \/        \/        \/_____/      \/     \/     \/     \/     \/
 
-" -ForegroundColor Blue
+" "Blue"
 
 
 $open = Read-Host -Prompt "Welcome! What would you like to do
@@ -512,19 +602,23 @@ $open = Read-Host -Prompt "Welcome! What would you like to do
 1: Map CVE patch status to computers.
 2: Get Information on a specific CVE.
 3: List all CVEs in a given month/year MSRC catalog.
+4: List all CVEs fixed by a specific KB.
 "
 
 switch ($open) {
     (1) {
-        Write-Host "Entering CVE2KB Function..." -ForegroundColor Cyan ; CVE2KB
+        debugLog "Entering CVE2KB Function..." "Cyan" ; CVE2KB
     }
     (2) {
-        Write-Host "Entering CVEInfo function..." -ForegroundColor Cyan ; CVEInfo
+        debugLog "Entering CVEInfo function..." "Cyan" ; CVEInfo
     }
     (3) {
-        Write-Host "Entering CVEList function..." -ForegroundColor Cyan ; CVEList
+        debugLog "Entering CVEList function..." "Cyan" ; CVEList
+    }
+    (4) {
+        debugLog "Entering KB2CVE Function..." "Cyan" ; KB2CVE
     }
     default {
-        Write-Host "You did not select an appropriate option. Please choose 1-3" -ForegroundColor Red ; exit 0
+        debugLog "You did not select an appropriate option. Please choose 1-3" ""Red"" ; exit 0
     }
 }
