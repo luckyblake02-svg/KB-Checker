@@ -1,123 +1,153 @@
-***
+```markdown
+# DeviceKB_Check.ps1
 
-# KB-Checker  
+## Overview
 
-PowerShell utility for verifying **Windows KB patch compliance** across endpoints.  
-It can run **standalone** on a local machine or optionally integrate with **Microsoft Intune** and **ConnectWise Control** to automate remote checking at scale.
+**DeviceKB_Check.ps1** is a PowerShell automation script built to help IT and security professionals cross-reference Microsoft CVEs and KB updates with live patch data from managed Windows devices. The script leverages three primary APIs:
 
-***
+- **Microsoft Graph API** – to query Intune-managed devices.
+- **MSRC Security Updates API** – to retrieve CVE and remediation (patch) data.
+- **ConnectWise Control API** – to remotely validate applied KB updates on devices[web:31][web:33][web:35].
 
-## ✳️ Overview  
+By combining these integrations, the script provides an end-to-end workflow to identify unpatched systems, export vulnerability reports, and simplify patch compliance validation.
 
-**DeviceKB_Check.ps1** helps administrators determine whether a specific Windows update (KB) is installed on one or more systems.  
-You can run it manually, point it to a computer list, or connect to managed devices dynamically through Intune or ScreenConnect.  
+---
 
-Each device check runs a PowerShell-level validation and produces two export files — *patched* and *unpatched* — for quick compliance reporting.
+## Features
 
-***
+- Queries monthly **MSRC vulnerability catalogs** for CVE and KB relationships.
+- Extracts and analyzes **Windows 11 remediation data** (21H2–24H2 build lines).
+- Dynamically maps OS versions to four-character codes (e.g., 22H2, 23H2, 24H2).
+- Integrates with **Microsoft Graph API** to gather Intune device inventory.
+- Optionally imports CSV or **Active Directory** lists when Intune is unavailable.
+- Uses **ConnectWise Control** (ScreenConnect) to remotely run “Get-HotFix” and verify patch installation.
+- Produces separate reports for patched and unpatched systems, exported to `C:\Temp\[filename].txt`.
 
-## ⚙️ Workflow  
+---
 
-1. The script prompts for a KB identifier (e.g., `KB5054007`).  
-2. Depending on available inputs or connected APIs, it determines the appropriate query mode:  
-   - **Local system** check  
-   - **Multiple computers** from a local file  
-   - **Microsoft Intune** device inventory (if selected)  
-   - **ConnectWise Control (ScreenConnect)** remote command execution (if available)  
-3. Executes `Get-HotFix` (locally or remotely) and validates whether the KB is installed.  
-4. Results are saved to the local path `C:\temp` as:  
-   ```
-   patched<KB>.txt
-   unpatched<KB>.txt
-   ```
-5. A summary of total devices checked, patched, and unpatched is shown upon completion.
+## Requirements
 
-***
+### PowerShell Modules
 
-## 📦 Features  
+Install the following modules before running the script:
 
-- Simple PowerShell-based KB validation — no external dependencies required.  
-- Optionally query **Intune-managed** devices or **ScreenConnect**-connected endpoints.  
-- Supports dynamic build mapping for Windows 11 releases (21H2–24H2).  
-- Includes **parallel query handling** and resilient retry logic for remote systems.  
-- Generates clear plain-text compliance output suitable for audit reports or SIEM ingestion.  
-- Fully offline capable — runs without any API integrations if invoked locally.
-
-***
-
-## 🚀 Requirements  
-
-### Minimum  
-- PowerShell 7.0 or newer  
-- Windows 10/11 (build 22000+)
-
-### Optional Modules  
-```powershell
-Install-Module Microsoft.Graph              # Intune integration
-Install-Module ConnectWiseControlAPI        # ScreenConnect integration
-Install-Module MsrcSecurityUpdates          # (Optional) MSRC metadata reference
+```
+Install-Module Microsoft.Graph
+Install-Module ConnectWiseControlAPI
+Install-Module MsrcSecurityUpdates
 ```
 
-***
+### Permissions and Access
 
-## 🔐 Permissions (for Optional Integrations)  
+- **MS Graph**: Requires `Device.Read.All` and `DeviceManagementManagedDevices.Read.All` scopes.  
+- **ConnectWise Control**: Use an account **without MFA** and HTTPS connectivity[web:31][web:33].
+- **MSRC API**: No authentication required; uses Microsoft’s public `Get-MsrcCvrfDocument` endpoint.
+- PowerShell 5.1+ (Windows) or PowerShell 7+ (cross-platform).
 
-**Microsoft Graph API** scopes required if Intune mode is used:
+---
+
+## Usage
+
+Run the script directly or from an elevated PowerShell prompt.
+
 ```
-Device.Read.All
-DeviceManagementManagedDevices.Read.All
-```
-
-***
-
-## 💾 Output Example  
-
-Generated export files:
-```
-C:\temp\patchedKB5054007.txt
-C:\temp\unpatchedKB5054007.txt
+.\DeviceKB_Check.ps1
 ```
 
-Each file contains one device name per line representing patch status.
+You will be presented with a startup menu:
 
-Console sample summary:
 ```
-Checked 14 devices
-9 patched, 5 unpatched
-Results saved to C:\temp\
+Welcome! What would you like to do
+
+1: Map CVE patch status to computers.
+2: Get Information on a specific CVE.
+3: List all CVEs in a given month/year MSRC catalog.
+4: List all CVEs fixed by a specific KB.
 ```
 
-***
+Each option triggers one of the following functions:
 
-## 🧠 Notes  
+| Option | Function | Description |
+|---------|-----------|-------------|
+| 1 | `CVE2KB` | Maps a selected CVE to devices, retrieves KB fix, and checks patch status via ConnectWise |
+| 2 | `CVEInfo` | Displays detailed CVE metadata, CVSS scores, FAQs, and remediation URLs |
+| 3 | `CVEList` | Lists all CVEs for the selected MSRC month/year, with grid-view export |
+| 4 | `KB2CVE` | Retrieves all CVEs fixed by a specific KB ID |
 
-- Compatible with Windows 11 builds 21H2 through 24H2.  
-- Skips unsupported OS builds below `10.0.22000`.  
-- Automatically detects missing modules and uses local fallback checks if APIs are unused.  
-- Retries remote queries for temporarily disconnected or offline machines.  
-- Built for both single-system use and large-scale remediation audits.  
+---
 
-***
+## Example Workflow
 
-## 🧾 License  
+### 1. Identify Vulnerability
+Search the MSRC catalog for a target CVE (e.g., CVE‑2025‑XXXX) using the **current month** or a specified date.
 
-Distributed under the **GPL-3.0 License**.  
-You are free to modify, extend, and integrate into enterprise automation or vulnerability compliance frameworks.
+### 2. Retrieve Patch Information
+The script maps the CVE to its corresponding KB update numbers for Windows 11 builds (e.g., KB5030213 for 23H2).
 
-***
+### 3. Query Devices
+Choose between:
+- **Intune Device List (Graph API)**  
+- **CSV Import**
+- **Active Directory Enumeration**
 
-## 👤 Author  
+### 4. Verify Patching
+If ConnectWise Control access is enabled, the script runs:
+```
+Get-HotFix
+```
+on each device and sorts them into:
+- `C:\Temp\patched<CVE>.txt`
+- `C:\Temp\unpatched<CVE>.txt`
 
-**Blake Miller**  
-Cybersecurity Professional – Endpoint Security & Compliance Automation  
-Kansas, United States  
+---
 
-***
+## Output Files
 
-## 📚 References  
+The script saves results and logs to:
 
-- [Microsoft Graph PowerShell SDK](https://learn.microsoft.com/en-us/powershell/microsoftgraph)  
-- [ConnectWise Control Public API](https://github.com/christaylorcodes/ConnectWiseControlAPI)  
-- [MSRC Security Updates API](https://api.msrc.microsoft.com/api)  
+| File | Location | Description |
+|------|-----------|-------------|
+| `patched*.txt` | `C:\Temp\` | Devices with patch applied |
+| `unpatched*.txt` | `C:\Temp\` | Devices missing patch |
+| `debug.txt` | `C:\Temp\` | Logs of errors and status messages |
+| `deviceList.csv` | `C:\Temp\` | Export of the final mapped devices if ConnectWise check skipped |
 
-***
+---
+
+## Function Overview
+
+| Function | Purpose |
+|-----------|----------|
+| `CVE2KB` | Pulls MSRC CVE, maps fix KBs, correlates device list, and triggers ConnectWise validation |
+| `CWProbe` | Executes ConnectWise API `Invoke-CWCCommand` to gather hotfix data |
+| `IntunePull` | Retrieves recent device sync details via Microsoft Graph |
+| `CSVImport` | Imports or generates device inventory from CSV or Active Directory |
+| `CVEInfo` | Displays extended CVE metadata and remediation paths |
+| `CVEList` | Lists all cataloged CVEs for input month/year |
+| `KB2CVE` | Converts KB ID to associated CVEs for reporting |
+| `debugLog` | Handles output coloring and persistent logging |
+
+---
+
+## Notes and Limitations
+
+- Only **Windows 11 versions 21H2 and newer** are mapped and supported.
+- ConnectWise API credentials must enable **non‑MFA accounts** for automated commands[web:31][web:33].
+- Output formatting may differ across PowerShell hosts that do not support ANSI colors.
+
+---
+
+## Credits
+
+- **Author:** Blake Miller (luckyblake02-svg)  
+- **ConnectWiseControlAPI:** by [Chris Taylor](https://github.com/christaylorcodes/ConnectWiseControlAPI)[web:31]  
+- **MSRC API:** by [Microsoft](https://github.com/microsoft/MSRC-Microsoft-Security-Updates-API)  
+- **Microsoft Graph PowerShell SDK:** Microsoft official module  
+
+---
+
+## License
+
+This script is distributed under the MIT License. External modules used retain their original licenses from respective authors.
+
+```
