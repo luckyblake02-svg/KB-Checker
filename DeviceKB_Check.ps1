@@ -526,7 +526,7 @@ function KB2CVE {
     while (!$r) {
         $kb = Read-Host -Prompt "What KB would you like to look up"
         #KB needs to only be numbers.
-        if ($kb -match '^[0-9]*') {
+        if ($kb -match '^[0-9][0-9]*') {
             $r = $true
         }
         elseif ($kb -match '[K][B][0-9]*') {
@@ -535,7 +535,7 @@ function KB2CVE {
             $r = $true
         }
         else {
-            debugLog "Please enter a KB ID (e.g. 123456)" "Magenta" ; exit 0
+            debugLog "Please enter a KB ID (e.g. 123456)" "Magenta"
         }
     }
 
