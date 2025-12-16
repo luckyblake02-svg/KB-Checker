@@ -98,7 +98,7 @@ function CVE2KB {
                 $dev.OSVersion = "24H2"
             }
             ("10.0.26200") {
-                $dev.OSVersion = "24H2"
+                $dev.OSVersion = "24H2/25H2"
             }
         }
         $dev.Patch = $fix
@@ -386,29 +386,37 @@ function CVEInfo {
             #Create loop to allow for easy retry upon user input error.
             $go = $true
             while ($go) {
-                $os = Read-Host -Prompt "`nPlease enter the OS you'd like a remediation for"
-                if ($os -match "([2][2-5][Hh][2])") {
-                    #Map 4 digit character to OS version. Literally the opposite of what we did earlier, but its human-readable vs. machine-readable :P
-                    switch ($os) {
-                        ("21H2") {
-                            $os = "10.0.22000"
-                        }
-                        ("22H2") {
-                            $os = "10.0.22621"
-                        }
-                        ("23H2") {
-                            $os = "10.0.22631"
-                        }
-                        ("24H2") {
-                            $os = Read-Host -Prompt "There are 2 builds for 24H2, please specify"
+                while ($os -notmatch "(10\.0\.)" -and $os -lt "10.0.22000") {
+                    $os = Read-Host -Prompt "`nPlease enter the OS you'd like a remediation for"
+                    if ($os -match "([2][2-5][Hh][2])") {
+                        #Map 4 digit character to OS version. Literally the opposite of what we did earlier, but its human-readable vs. machine-readable :P
+                        switch ($os) {
+                            ("21H2") {
+                                $os = "10.0.22000"
+                            }
+                            ("22H2") {
+                                $os = "10.0.22621"
+                            }
+                            ("23H2") {
+                                $os = "10.0.22631"
+                            }
+                            ("24H2") {
+                                $end = Read-Host -Prompt "There are 2 builds for 24H2, please specify (26100/26200)"
+                                while ($end -ne "26100" -and $end -ne "26200") {
+                                    debugLog "Please enter either 26100 format or 2600." "Magenta"
+                                    $end = Read-Host -Prompt "There are 2 builds for 24H2, please specify (26100/26200)"
+                                }
+                                $os = "10.0." + $end
+                            }
+                            ("25H2") {
+                                $os = "10.0.26200"
+                            }
                         }
                     }
-                }
-                elseif ($os -match "(10\.0\.)" -and $os -ge "10.0.22000") {
-                }
-                else {
-                    #I need to be able to read it.
-                    debugLog "Please enter either 2XH2 format or 10.0.XXXXX format." "Magenta" ; exit 0
+                    else {
+                        #I need to be able to read it.
+                        debugLog "Please enter either 2XH2 format or 10.0.XXXXX format." "Magenta"
+                    }
                 }
                 #Sometimes there are multiple values.
                 foreach ($val in ($data.Remediations | Where-Object FixedBuild -Match $os)) {
