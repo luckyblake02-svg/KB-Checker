@@ -125,6 +125,11 @@ function CVE2KB {
 }
         
 function CWProbe {
+
+    #Declare parameter as the array created in main function.
+    Param (
+        [PSCustomObject]$out
+    )
     
     debugLog "
     
@@ -137,10 +142,6 @@ function CWProbe {
     
     " "Blue"
     
-    #Declare parameter as the array created in main function.
-    Param (
-        [PSCustomObject]$out
-    )
     #Attempt to connect to CW API. This requires a user with NO MFA, or else connection will fail.
     try { debugLog "Attempting to connect to ConnectWise Control" "Cyan" ; Connect-CWC -Server 'server.connectwise.com' }
     catch { debugLog "Connection attemp failed." "Red" ; exit 0 }
@@ -251,7 +252,7 @@ function IntunePull {
             $dev.LastSyncDateTime = "NULL"
             $dev.OSVersion = "NULL"
         }
-        $csv += [PSCustomObject] {
+        $csv += [PSCustomObject] @{
             DeviceName = $dev.DeviceName 
             OSVersion = $dev.OSVersion
         }
