@@ -1,14 +1,13 @@
 <#
 You will need the following to start
 Install-Module Microsoft.Graph and import
-Install-Module ConnectWiseControlAPI and import
 Install-Module MsrcSecurityUpdates and import
+Install-Module Microsoft.Graph.Intune and import
 This script will ask the user for the month/year MSRC catalog they wish to look at, then connect via MSRC API and grab the list of vulnerabilities. The user will then be promped for the specific CVE ID.
 Then, the remediations for Windows 11 devices will be grabbed for that specific CVE.
 Then, connect to MS Graph, then download a list of all devices that have synced within the last 15 days to Intune. It will then map their OS version to a 4-character code.
-Then set the indicated patch for the remediation. Finally, it will connect to ConnectWise Screenconnect, run 'Get-Hotfix' to list all applied patches, and check if any patched match the specified patch for the OS.
+Then set the indicated patch for the remediation. Finally, it will connect to Intune, run 'Get-Hotfix' to list all applied patches, and check if any patched match the specified patch for the OS.
 Patched devices get stored in $KBList, other devices get stored in $KBNotList.
-ConnectWise API from https://github.com/christaylorcodes/ConnectWiseControlAPI/tree/master by christaylorcodes.
 MSRC API from https://github.com/microsoft/MSRC-Microsoft-Security-Updates-API by microsoft.
 -Blake Miller
 #>
@@ -114,16 +113,80 @@ function CVE2KB {
     $csv = ""
     debugLog "`nDevice OS mapped to 4-Character code (e.g. 24H2) and Patch property applied." "Cyan"
 
-    $test = Read-Host -Prompt "`nCurrently, the only supported way to test for the patch being applied is through Connectwise. Would you like to continue"
-    if ($test -match "([Yy][Ee]?[Ss]?)") {
-        CWProbe $out
-    }
-    else {
-        $out | Export-Csv -Path "C:\temp\deviceList.csv" -NoTypeInformation
-        debugLog "Nothing left to do, we have exported the current csv to your C:\Temp folder!" "Cyan"
-    }
+    do {
+        $test = Read-Host -Prompt "`nCurrently, the only supported way to test for the patch being applied is through Intune admin center, RPC, or ConnectWise(CW). Or, you can export to CSV. How would you like to continue"
+        if ($test -match "([Ii][ntuneNTUNE]])") {
+            debugLog "You will need to go to the Intune Admin center and manually search hotfixes on the devices" "Cyan"
+            debugLog "https://intune.microsoft.com/#home" "Cyan"
+            Read-Host "Press anywhere to quit..." ; exit 0
+        }
+        elseif ($test -match "([Rr][Pp][Cc])") {
+            rpcQuery $out
+        }
+        elseif ($test -match "([Cc][Ww])") {
+            CWProbe $out
+        }
+        elseif ($test -match "([Cc][Ss][Vv])") {
+            $out | Export-Csv -Path "C:\temp\deviceList.csv" -NoTypeInformation
+            debugLog "Nothing left to do, we have exported the current csv to your C:\Temp folder!" "Cyan"
+        }
+        else {
+            debugLog "Please enter RPC, CW, or CSV" "Magenta"
+        }
+    } while ($test -notmatch "([Rr][Pp][Cc])" -and "([Cc][Ww])" -and "([Cc][Ss][Vv])")
 }
         
+
+function rpcQuery {
+    [CmdletBinding()]
+    param(
+        [Paramater(Mandatory=$true, Position=0)]
+        [PSCustomeObject]$devList
+    )
+
+    $KBList = @()
+    $KBNotList = @()
+    $report = @()
+    $y = 0
+    $n = 0
+
+    foreach ($dev in $devList) {
+        $devName = $dev.DeviceName
+        $status = try {Get-HotFix -ComputerName "$devName"} catch {debugLog "RPC Error for $devName" "Red"}
+
+        $lines = $status -split "`n" | Where-Object {$_ -notmatch "^-+" -and $_ -notmatch "Source"}
+
+        $report += foreach ($line in $lines) {
+            if ($line -match "(KB[0-9]*)") {
+                [PSCustomObject]@{
+                    Device = $devName
+                    Hotfixes = $matches[0]
+                }
+            }
+        }
+        $check = $report | Where-Object Hotfixes -eq $dev.Patch
+
+        if ($check) {
+            debugLog "Patch appears to be applied to $devName!" "Cyan"
+            $KBList += $check
+            $y += 1
+        }
+        else {
+            debugLog "Patch is not applied to $devName, please remediate." "DarkCyan"
+            $KBNotList += [PSCustomObject]@{
+                Machine = $devName
+                MissingPatch = $dev.Patch
+            }
+            $n += 1
+        }
+    }
+    debugLog "It appears that there are $y patched devices and $n unpatched devices total." "Cyan"
+
+    $KBList | Out-File "C:\temp\patched$vuln.txt"
+    $KBNotList | Out-File "C:\temp\unpatched$vuln.txt"
+
+}
+
 function CWProbe {
 
     #Declare parameter as the array created in main function.
@@ -240,12 +303,13 @@ function IntunePull {
     $date = (Get-Date).AddDays(-15)
 
     #Grab list of devices from Intune. Requires Intune administrator or read all devices.
-    $Tmpcsv = try { debugLog "Grabbing Intune Device List..." "Cyan" ; Get-MgDeviceManagementManagedDevice | Select-Object deviceName, LastSyncDateTime, OSVersion | Where-Object LastSyncDateTime -GT $date -NoTypeInformation }
+    $Tmpcsv = try { debugLog "Grabbing Intune Device List..." "Cyan" ; Get-MgDeviceManagementManagedDevice | Select-Object deviceName, LastSyncDateTime, OSVersion | Where-Object LastSyncDateTime -GT $date }
     catch { debugLog "Intune query failed." "Red" ; exit 0 }
 
     foreach ($dev in $Tmpcsv) {
         #Store only the first 3 block of the OS version.
         $OSVersion = ($dev.OSVersion -split '\.')[0..2] -join '.'
+        $dev.OSVersion = $OSVersion
         #If the device is Windows 10 (Deprecated and should be its own fix.) set all values to NULL.
         if ($OSVersion -lt "10.0.22000") {
             $dev.DeviceName = "NULL"
